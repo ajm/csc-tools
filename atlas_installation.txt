@@ -15,7 +15,7 @@ cd ATLAS
 mkdir build
 cd build
 ../configure --shared --prefix=/home/u1/amedlar/.local/ --with-netlib-lapack-tarfile=/home/u1/amedlar/lapack-3.4.2.tgz --cflags='-fPIC'
-make # this takes fucking ages
+make # this takes ages
 make install
 
 # <---- up to here
