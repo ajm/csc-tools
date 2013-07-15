@@ -1,0 +1,26 @@
+# Everything assumes that this has been done already, 
+# the complete process took ~90 minutes on vuori and I am not really 
+# sure if the 'make shared' lines are necessary given that --shared 
+# is passed to the configure script
+#
+# this is half from http://new.scipy.org/building/linux.html#building-atlas
+
+
+eval `modulecmd bash swap PrgEnv-pgi PrgEnv-gnu/4.7.1`
+
+wget http://www.netlib.org/lapack/lapack-3.4.2.tgz
+wget http://sourceforge.net/projects/math-atlas/files/latest/download?source=files
+tar xf atlas*.tar.bz2
+cd ATLAS
+mkdir build
+cd build
+../configure --shared --prefix=/home/u1/amedlar/.local/ --with-netlib-lapack-tarfile=/home/u1/amedlar/lapack-3.4.2.tgz --cflags='-fPIC'
+make # this takes fucking ages
+make install
+
+# <---- up to here
+# necessary?
+
+cd lib
+make shared
+make ptshared

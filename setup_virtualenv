@@ -1,0 +1,78 @@
+#!/bin/bash -l
+
+ERRORFILE='error.log'
+ENV='env'
+
+run() {
+    printf "\033[94m$*\n\033[0m"
+
+    $@ > /dev/null 2> $ERRORFILE
+
+    if [[ $? != 0 ]] ; then
+        printf "\033[91m\tFAILED (stderr was redirected to $ERRORFILE)\n\033[0m"
+        exit 1
+    fi
+
+    rm -f $ERRORFILE
+}
+
+out() {
+    printf "\033[92m$*\n\033[0m"
+}
+
+
+
+if [[ -d $ENV ]] ; then
+    out Directory ./$ENV exists, delete directory and rerun this script
+    exit 1
+fi
+
+# swap compilers to gcc and grab a newer python
+out Loading modules PrgEnv-gnu/4.7.1 and python/2.6.5-gcc ...
+eval `modulecmd bash swap PrgEnv-pgi PrgEnv-gnu/4.7.1`
+eval `modulecmd bash load python/2.6.5-gcc 2> /dev/null`
+
+# check if pip is installed
+if [[ ! `which pip 2> /dev/null` ]] ; then
+    out Could not find pip, installing...
+    run easy_install --user pip
+
+    echo 'export PATH=$PATH:$HOME/.local/bin' >> ~/.bashrc
+    source ~/.bashrc
+fi
+
+# check if virtualenv is installed
+if [[ ! `which virtualenv 2> /dev/null` ]] ; then
+    out Could not find virtualenv, installing...
+    run pip install --user virtualenv
+fi
+
+# create new environment
+out Creating virtual environment
+run virtualenv $ENV
+
+out Copying ATLAS libraries to ./"$ENV"/lib/
+# atlas libraries for numpy/scipy
+run cp $HOME/.local/lib/lib{atlas,cblas,f77blas,lapack,ptcblas,ptf77blas,ptlapack}.a $ENV/lib/
+run cp $HOME/.local/lib/lib{s,t}atlas.so $ENV/lib/
+
+out Activating...
+# activate
+run source $ENV/bin/activate
+
+out Installing python packages...
+# install requested packages
+#pip install -r $REQUIREMENTS_FILE
+run pip install numpy
+run pip install scipy
+run pip install biopython
+
+
+printf "\033[94m\nOKAY! what I just did was setup a virtual python environment in ./env,\n"
+printf "\033[94mthe way you use this is to type the following command (or include in a job script)\n"
+printf "\033[94meverytime you run your program:\n"
+printf "\033[91m\t\$ source ./$ENV/bin/activate\n\n"
+printf "\033[94mif you need to add any other packages used pip after you have activated the environment:\n"
+printf "\033[91m\t\$ pip install package_name\n\n"
+printf "\033[0m"
+
