@@ -1,0 +1,149 @@
+#!/usr/bin/env python2.4
+import sys
+import os
+import pexpect
+import socket
+import time
+
+from subprocess import Popen, PIPE
+
+
+PASSWD='xxx'
+
+NO_COLOURS=False
+INFO_COLOUR='\033[94m'
+FAIL_COLOUR='\033[91m'
+GOOD_COLOUR='\033[92m'
+RESET_COLOUR='\033[0m'
+
+if NO_COLOURS :
+    INFO_COLOURS = FAIL_COLOURS = GOOD_COLOUR = RESET_COLOUR = ''
+
+def run(args) :
+    if isinstance(args, str) :
+        args = args.split()
+
+    p = Popen(args, stdout=PIPE) #, stderr=open(os.devnull, 'w'))
+    
+    if p.wait() != 0 :
+        bad('shit...')
+
+    return map(lambda x : x.strip(), p.stdout)
+
+def out(s, colour, newline) :
+    msg = colour + s + RESET_COLOUR
+    if newline :
+        msg += '\n'
+    sys.stdout.write(msg)
+
+def bad(s, newline=True) :
+    out(s, FAIL_COLOUR, newline)
+    sys.exit(1)
+
+def good(s, newline=True) :
+    out(s, GOOD_COLOUR, newline)
+
+def info(s, newline=True) :
+    out(s, INFO_COLOUR, newline)
+
+def iinit() :
+    child = pexpect.spawn('iinit')
+    child.expect('Enter your current iRODS password:', timeout=5)
+    child.sendline(PASSWD)
+
+    child.expect(pexpect.EOF, timeout=5)
+    child.close()
+
+    if child.exitstatus == 0 :
+        good('iinit successful')
+    else :
+        bad("iinit failed (exitstatus = %s)" % str(child.exitstatus))
+    
+def icd(dir) :
+    info('icd %s' % dir)
+    run(['icd', dir])
+
+def iget(filename) :
+    info('iget -f %s' % filename)
+    run(['iget', '-f', filename])
+
+def ils() :
+    return run('ils')[1:]
+
+def rm(filename) :
+    info('deleting %s' % filename)
+    try :
+        os.remove(filename)
+    except OSError, ose :
+        out(str(ose), FAIL_COLOUR, newline=True)
+
+def usage() :
+    name = os.path.basename(sys.argv[0])
+    bad('Usage: %s <get|clean|login> path/to/sample/dir/\n\n\te.g.: %s get beetle_data/Sample_C4\n' % (name, name))
+
+def main() :
+    if len(sys.argv) < 2 :
+        usage()
+    
+    command = sys.argv[1]
+
+    if command not in ('get', 'clean', 'login') :
+        usage()
+
+# this does not bloody work...
+#    if socket.gethostname().startswith('vuori') :
+#        #run('module add iRODS') # 'module' is just an alias
+#        info('loading iRODS')
+#        run('modulecmd tcsh add iRODS')
+
+#
+#   needs to be eval `comand`
+#
+
+    iinit()
+
+    if command == 'login' :
+        return 0
+
+    if len(sys.argv) != 3 :
+        usage()
+
+    sample = sys.argv[2]
+    sample_name = os.path.basename(sample)
+
+    start_time = time.time()
+
+    os.chdir(os.environ['WRKDIR'])
+
+    icd(sample)
+
+    if command == 'get' :
+        manifest = open(os.path.basename(sample) + '.input', 'w')
+        
+        for f in ils() :
+            iget(f)
+            print >> manifest, f
+
+        manifest.close()
+
+    elif command == 'cleanup' :
+        for f in ils() :
+            rm(f)
+
+    #for f in ils() :
+    #    if command == 'get' :
+    #        iget(f)
+    #    elif command == 'clean' :
+    #        rm(f)
+
+    good('done in %d seconds' % (time.time() - start_time))
+    
+    return 0
+
+if __name__ == '__main__' :
+    try :
+        sys.exit(main())
+
+    except KeyboardInterrupt :
+        bad('Killed by user\n')
+
